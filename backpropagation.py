@@ -2,6 +2,8 @@ import random
 import math
 import os
 import sys
+import ast
+
 
 
 class NeuralNetwork:
@@ -101,18 +103,19 @@ class NeuralNetwork:
                 # delta de capa oculta=Error de capa de oculta*entrada net
                 pd_error_wrt_weight = self.LEARNING_RATE * \
                     errorescapasalida[o] * \
-                    self.output_layer.neurons[o].calculate_pd_total_net_input_wrt_weight(
-                        w_ho)
+                    self.output_layer.neurons[o].calculate_pd_total_net_input_wrt_weight(w_ho)
 
                 # Δw = α * ∂Eⱼ/∂wᵢ
                 # Actualizar pesos de capa salida
                 # wkj(t+1)=wkj(t)+Δwji
                 # wkj(t+1)=(wkj(t+1)-wkj(t))+Δwkj
 
-                self.output_layer.neurons[o].weights[w_ho] = self.output_layer.neurons[o].weights[w_ho -
-                                                                                                  1] + pd_error_wrt_weight
-                print(self.output_layer.neurons[o].weights)
-                self.Final_Weights = self.output_layer.neurons[o].weights
+                self.output_layer.neurons[o].weights[w_ho] = self.output_layer.neurons[o].weights[w_ho - 1] + pd_error_wrt_weight
+                
+        f = open ('weights.txt','w')
+        f.write(str(self.output_layer.neurons[0].weights))
+        f.close()
+        #print(self.output_layer.neurons[o].weights)
         # 4. Update hidden neuron weights
         for h in range(len(self.hidden_layer.neurons)):
             for w_ih in range(len(self.hidden_layer.neurons[h].weights)):
@@ -280,7 +283,11 @@ def cargarTrainingPrueba():
         trainsetElement.append(inputNN)
         trainsetElement.append(outputNN)
         training_setsprueba.append(trainsetElement)
-
+def load_weights():
+    file = open('weights.txt','r')
+    pesos = ast.literal_eval(file.read())
+    print(pesos[0],pesos[1])
+    file.close()
 
 if __name__ == "__main__":
     cargarTrainingSet()
@@ -301,3 +308,5 @@ if __name__ == "__main__":
     print("capa salida Salida:", nn.output_layer.neurons[0].output)
     print("capa oculta Salida:", nn.hidden_layer.neurons[0].output)
     print("Pesos finales:", nn.Final_Weights)
+    load_weights()
+    
