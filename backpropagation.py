@@ -3,9 +3,6 @@ import math
 import os
 import sys
 import ast
-
-
-
 class NeuralNetwork:
     LEARNING_RATE = 0.5
     Final_Weights = []
@@ -107,7 +104,7 @@ class NeuralNetwork:
             errorescapaoculta[h] = d_error_wrt_hidden_neuron_output * \
                 self.hidden_layer.neurons[h].calculate_pd_total_net_input_wrt_input()
 
-        f = open ('weightsHiddenLayer.txt','w+')
+        f = open ('weightsHiddenLayer.txt','w')
         for x in range(len(self.hidden_layer.neurons)):
             f.write(str(self.hidden_layer.neurons[x].weights)+',') # como hay una neurona
         f.close()
@@ -129,7 +126,7 @@ class NeuralNetwork:
 
                 self.output_layer.neurons[o].weights[w_ho] = self.output_layer.neurons[o].weights[w_ho - 1] + pd_error_wrt_weight
         
-        f = open ('weightsOutputLayer.txt','w+')
+        f = open ('weightsOutputLayer.txt','w')
         for x in range(len(self.output_layer.neurons)):
             f.write(str(self.output_layer.neurons[x].weights)+'\n') # como hay una neurona
         f.close()
@@ -306,35 +303,27 @@ def load_weights_hidden_layer():
     pesos = ast.literal_eval(file.read())
     #print(len(pesos))
     file.close()
-
-
     return pesos
-
 if __name__ == "__main__":
     cargarTrainingSet()
     nn = NeuralNetwork(len(training_sets[0][0]), 2, len(training_sets[0][1]))
     
-    for i in range(10000):
-
+    for i in range(1000):
         training_inputs, training_outputs = random.choice(training_sets)
         nn.train(training_inputs, training_outputs)
-
-        #print(i, nn.calculate_total_error(training_sets))
-    print("capa salida Salida:", nn.output_layer.neurons[0].output)
-    print("capa oculta Salida:", nn.hidden_layer.neurons[0].output)
+        print(i, nn.calculate_total_error(training_sets))
 
     print("Prueba")
+    print(training_inputs)
     cargarTrainingPrueba()
+    print(training_setsprueba)
     training_inputs_d, training_outputs_d = random.choice(training_setsprueba)
-    nn.feed_forward(training_inputs_d)
-
+    #nn.feed_forward(training_inputs_d)
     print("capa salida Salida:", nn.output_layer.neurons[0].output)
     print("capa oculta Salida:", nn.hidden_layer.neurons[0].output)
-    print("Pesos finales:", nn.Final_Weights)
-
-
+    print("Pesos finales:", nn.output_layer.neurons[0].weights)
     print("======RESULTADOS=======")
-    print(training_outputs)
-    nn.test_algorithm(training_inputs)
-    
+    print(training_outputs_d)
     load_weights_hidden_layer()
+    nn.test_algorithm(training_inputs_d)
+    
