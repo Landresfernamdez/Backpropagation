@@ -43,7 +43,6 @@ class NeuralNetwork:
                     self.output_layer.neurons[o].weights.append(
                         output_layer_weights[weight_num])
                 weight_num += 1
-            print(len(self.output_layer.neurons[o].weights))
     def inspect(self):
         print('------')
         print('* Inputs: {}'.format(self.num_inputs))
@@ -55,6 +54,14 @@ class NeuralNetwork:
         self.output_layer.inspect()
         print('------')
 
+    def feed_forwardWithoutSimboide(self, inputs):
+        hidden_layer_outputs = self.hidden_layer.feed_forwardWithoutSimboide(
+            inputs)  # Calcula las salidas de la capa oculta
+        # print("Salidas capa oculta:",hidden_layer_outputs)
+        output_layer_outputs = self.output_layer.feed_forward(
+            hidden_layer_outputs)  # Calcula las salidas de la capa de salida
+        # print("salidas capa de salida",output_layer_outputs)
+        return output_layer_outputs
     def feed_forward(self, inputs):
         hidden_layer_outputs = self.hidden_layer.feed_forward(
             inputs)  # Calcula las salidas de la capa oculta
@@ -63,12 +70,12 @@ class NeuralNetwork:
             hidden_layer_outputs)  # Calcula las salidas de la capa de salida
         # print("salidas capa de salida",output_layer_outputs)
         return output_layer_outputs
-    def test_algorithm(self, training_inputs):
-        finalOutputs = self.feed_forward(training_inputs)
-        
+    def test_algorithm(self,inputs):
+        finalOutputs = self.feed_forward(inputs)
+        print("Salida final")
+        print(finalOutputs)
         print("salidas: "+str(len(self.output_layer.neurons)))
-        for x in range(len(self.output_layer.neurons)):
-            print(self.output_layer.neurons[x].output)
+        
 
         print("\n\n")
 
@@ -123,19 +130,15 @@ class NeuralNetwork:
                 # Actualizar pesos de capa salida
                 # wkj(t+1)=wkj(t)+Δwji
                 # wkj(t+1)=(wkj(t+1)-wkj(t))+Δwkj
-
                 self.output_layer.neurons[o].weights[w_ho] = self.output_layer.neurons[o].weights[w_ho - 1] + pd_error_wrt_weight
-        
         f = open ('weightsOutputLayer.txt','w')
         for x in range(len(self.output_layer.neurons)):
             f.write(str(self.output_layer.neurons[x].weights)+'\n') # como hay una neurona
         f.close()
-
         #print(self.output_layer.neurons[o].weights)
         # 4. Update hidden neuron weights
         for h in range(len(self.hidden_layer.neurons)):
             for w_ih in range(len(self.hidden_layer.neurons[h].weights)):
-
                 # ∂Eⱼ/∂wᵢ = ∂E/∂zⱼ * ∂zⱼ/∂wᵢ
                 # Calculo del delta de capa oculta
                 # Δwji (t+1)=Spi* Xpi
@@ -143,18 +146,89 @@ class NeuralNetwork:
                 pd_error_wrt_weight = self.LEARNING_RATE * \
                     errorescapaoculta[h] * \
                     self.hidden_layer.neurons[h].calculate_pd_total_net_input_wrt_weight(w_ih)
-
                 # Δw = α * ∂Eⱼ/∂wᵢ
                 # Actualizar pesos de capa oculta
                 # wji(t+1)=wji(t)+Δwji
                 # wji(t+1)=(wji(t+1)-wji(t))+Δwji
                 self.hidden_layer.neurons[h].weights[w_ih] = self.hidden_layer.neurons[h].weights[w_ih -
                                                                                                   1] + pd_error_wrt_weight                
+    # Uses online learning, ie updating the weights after each training case
+    def trainwithoutSimboide(self, training_inputs, training_outputs):
+        
+        self.feed_forwardWithoutSimboide(training_inputs)
+        
+        # 1 Calcular el error de salida
+        # Spk=(deseado - salida)*salida(1 - salida)
 
+
+        errorescapasalida = [0] * len(self.output_layer.neurons)
+        for o in range(len(self.output_layer.neurons)):
+            errorescapasalida[o] = self.output_layer.neurons[o].calculate_pd_error_wrt_total_net_input(training_outputs[o])
+        # 2. Calculando el error de la capa oculta
+        # salida(1-salida) * Sumatoria de (error de salida* peso de la salida)
+        # Ypj(1-Ypj) * Σ Spk*Wkj
+        errorescapaoculta = [0] * len(self.hidden_layer.neurons)
+        for h in range(len(self.hidden_layer.neurons)):
+            # We need to calculate the derivative of the error with respect to the output of each hidden layer neuron
+            # dE/dyⱼ = Σ ∂E/∂zⱼ * ∂z/∂yⱼ = Σ ∂E/∂zⱼ * wᵢⱼ
+
+            # Sumatoria de (error de salida* peso de la salida)
+            # Σ Spk*Wkj
+            d_error_wrt_hidden_neuron_output = 0
+            for o in range(len(self.output_layer.neurons)):
+                d_error_wrt_hidden_neuron_output += errorescapasalida[o] * \
+                    self.output_layer.neurons[o].weights[h]
+            # ∂E/∂zⱼ = dE/dyⱼ * ∂zⱼ/∂
+            #   Sumatoria de (error de salida* peso de la salida)* salida(1-salida)
+            #   Σ(Spk*Wkj)*Ypj(1-Ypj)
+            errorescapaoculta[h] = d_error_wrt_hidden_neuron_output * \
+                self.hidden_layer.neurons[h].calculate_pd_total_net_input_wrt_input()
+
+        f = open ('weightsHiddenLayer.txt','w')
+        for x in range(len(self.hidden_layer.neurons)):
+            f.write(str(self.hidden_layer.neurons[x].weights)+',') # como hay una neurona
+        f.close()
+        # 3. Update output neuron weights        
+        for o in range(len(self.output_layer.neurons)):
+            for w_ho in range(len(self.output_layer.neurons[o].weights)):
+                # ∂Eⱼ/∂wᵢⱼ = ∂E/∂zⱼ * ∂zⱼ/∂wᵢⱼ
+                # Calculo del delta de capa salida
+                # Δwkj (t+1)=Spk* Ypj
+                # delta de capa oculta=Error de capa de oculta*entrada net
+                pd_error_wrt_weight = self.LEARNING_RATE * \
+                    errorescapasalida[o] * \
+                    self.output_layer.neurons[o].calculate_pd_total_net_input_wrt_weight(w_ho)
+
+                # Δw = α * ∂Eⱼ/∂wᵢ
+                # Actualizar pesos de capa salida
+                # wkj(t+1)=wkj(t)+Δwji
+                # wkj(t+1)=(wkj(t+1)-wkj(t))+Δwkj
+                self.output_layer.neurons[o].weights[w_ho] = self.output_layer.neurons[o].weights[w_ho - 1] + pd_error_wrt_weight
+        f = open ('weightsOutputLayer.txt','w')
+        for x in range(len(self.output_layer.neurons)):
+            f.write(str(self.output_layer.neurons[x].weights)+'\n') # como hay una neurona
+        f.close()
+        #print(self.output_layer.neurons[o].weights)
+        # 4. Update hidden neuron weights
+        for h in range(len(self.hidden_layer.neurons)):
+            for w_ih in range(len(self.hidden_layer.neurons[h].weights)):
+                # ∂Eⱼ/∂wᵢ = ∂E/∂zⱼ * ∂zⱼ/∂wᵢ
+                # Calculo del delta de capa oculta
+                # Δwji (t+1)=Spi* Xpi
+                # delta de capa oculta=Error de capa de oculta*entrada net
+                pd_error_wrt_weight = self.LEARNING_RATE * \
+                    errorescapaoculta[h] * \
+                    self.hidden_layer.neurons[h].calculate_pd_total_net_input_wrt_weight(w_ih)
+                # Δw = α * ∂Eⱼ/∂wᵢ
+                # Actualizar pesos de capa oculta
+                # wji(t+1)=wji(t)+Δwji
+                # wji(t+1)=(wji(t+1)-wji(t))+Δwji
+                self.hidden_layer.neurons[h].weights[w_ih] = self.hidden_layer.neurons[h].weights[w_ih -
+                                                                                                  1] + pd_error_wrt_weight
     def calculate_total_error(self, training_sets):
         total_error = 0
-        for t in range(len(training_sets)):
-            training_inputs, training_outputs = training_sets[t]
+        for x in range(len(training_sets)):
+            training_inputs, training_outputs = training_sets[x]
             self.feed_forward(training_inputs)
             for o in range(len(training_outputs)):
                 total_error += self.output_layer.neurons[o].calculate_error(
@@ -180,7 +254,11 @@ class NeuronLayer:
         for neuron in self.neurons:
             outputs.append(neuron.calculate_output(inputs))
         return outputs
-
+    def feed_forwardWithoutSimboide(self, inputs):
+        outputs = []
+        for neuron in self.neurons:
+            outputs.append(neuron.calculate_outputWhithoutSimboide(inputs))
+        return outputs
     def get_outputs(self):
         outputs = []
         for neuron in self.neurons:
@@ -197,8 +275,12 @@ class Neuron:
         self.inputs = inputs
         self.output = self.operation(self.calculate_total_net_input())
         return self.output
+    # Se encarga de calcular la net de la neurona sin el calculo de la funcion simboide
+    def calculate_outputWhithoutSimboide(self,inputs):
+        self.inputs = inputs
+        self.output = self.calculate_total_net_input()
+        return self.output
     # Se encarga de calcular la net de la neurona
-
     def calculate_total_net_input(self):
         total = 0
         for i in range(len(self.inputs)):
@@ -206,7 +288,7 @@ class Neuron:
         return total
     # Realiza la formula de la salida recibiendo la net como parametro
     # salida=1/1+e^-net
-
+    #Funcion simboide
     def operation(self, total_net_input):
         return 1 / (1 + math.exp(-total_net_input))
 
@@ -237,66 +319,54 @@ class Neuron:
 
     def calculate_pd_total_net_input_wrt_weight(self, index):
         return self.inputs[index]
-
-
-'''nn = NeuralNetwork(2, 2, 2, hidden_layer_weights=[0.15, 0.2, 0.25, 0.3], output_layer_weights=[0.4, 0.45, 0.5, 0.55])
-for i in range(10000):
-    nn.train([0.05, 0.1], [0.01, 0.99])
-    print(i, round(nn.calculate_total_error([[[0.05, 0.1], [0.01, 0.99]]]), 9))
-
- XOR example:'''
-
 training_sets = []
-
-
 def cargarTrainingSet():
     lista = os.listdir(os.path.dirname(
         os.path.abspath(__file__)) + "\\inputs\\")
-    for filename in lista:
-        trainsetElement = []
-        currentPath = os.path.dirname(os.path.abspath(__file__)) + "\\inputs\\"
-        index = lista.index(filename)
-        outputNN = []
-        inputNN = []
-        if(index % 2 == 0):
-            outputNN.append(0)
-        else:
-            outputNN.append(1)
-        with open(currentPath + filename, "r") as f:
-            linea = f.read()
-            for elemento in linea:
-                if(elemento == '1' or elemento == '0'):
-                    binary = int(elemento)
-                    inputNN.append(binary)
-        trainsetElement.append(inputNN)
-        trainsetElement.append(outputNN)
-        training_sets.append(trainsetElement)
+    for folderfilenames in lista:
+        listaFolders=os.listdir(os.path.dirname(
+        os.path.abspath(__file__)) + "\\inputs\\"+folderfilenames)
+        for filename in listaFolders:
+            currentPath = os.path.dirname(os.path.abspath(__file__)) + "\\inputs\\"+folderfilenames+"\\"
+            index = listaFolders.index(filename)
+            trainsetElement = []
+            outputNN = []
+            inputNN = []
+            outputNN.append(int(folderfilenames))
+            with open(currentPath + filename, "r") as f:
+                linea = f.read()
+                for elemento in linea:
+                    if(elemento == '1' or elemento == '0'):
+                        binary = int(elemento)
+                        inputNN.append(binary)
+            trainsetElement.append(inputNN)
+            trainsetElement.append(outputNN)
+            training_sets.append(trainsetElement)
 
 training_setsprueba = []
 
 def cargarTrainingPrueba():
     lista = os.listdir(os.path.dirname(
         os.path.abspath(__file__)) + "\\inputsdesconocidas\\")
-    for filename in lista:
-        trainsetElement = []
-        currentPath = os.path.dirname(os.path.abspath(
-            __file__)) + "\\inputsdesconocidas\\"
-        index = lista.index(filename)
-        outputNN = []
-        inputNN = []
-        if(index % 2 == 0):
-            outputNN.append(0)
-        else:
-            outputNN.append(1)
-        with open(currentPath + filename, "r") as f:
-            linea = f.read()
-            for elemento in linea:
-                if(elemento == '1' or elemento == '0'):
-                    binary = int(elemento)
-                    inputNN.append(binary)
-        trainsetElement.append(inputNN)
-        trainsetElement.append(outputNN)
-        training_setsprueba.append(trainsetElement)
+    for folderfilenames in lista:
+        listaFolders=os.listdir(os.path.dirname(
+        os.path.abspath(__file__)) + "\\inputsdesconocidas\\"+folderfilenames)
+        for filename in listaFolders:
+            currentPath = os.path.dirname(os.path.abspath(__file__)) + "\\inputsdesconocidas\\"+folderfilenames+"\\"
+            index = listaFolders.index(filename)
+            outputNN = []
+            inputNN = []
+            trainsetElement = []
+            outputNN.append(int(folderfilenames))
+            with open(currentPath + filename, "r") as f:
+                linea = f.read()
+                for elemento in linea:
+                    if(elemento == '1' or elemento == '0'):
+                        binary = int(elemento)
+                        inputNN.append(binary)
+            trainsetElement.append(inputNN)
+            trainsetElement.append(outputNN)
+            training_setsprueba.append(trainsetElement)
 
 def load_weights_hidden_layer():
     file = open('weightsHiddenLayer.txt','r')
@@ -306,24 +376,39 @@ def load_weights_hidden_layer():
     return pesos
 if __name__ == "__main__":
     cargarTrainingSet()
-    nn = NeuralNetwork(len(training_sets[0][0]), 2, len(training_sets[0][1]))
-    
-    for i in range(1000):
-        training_inputs, training_outputs = random.choice(training_sets)
-        nn.train(training_inputs, training_outputs)
-        print(i, nn.calculate_total_error(training_sets))
-
-    print("Prueba")
-    print(training_inputs)
+    #Entrenamiento con funcion simboide
+    nn = NeuralNetwork(len(training_sets[0][0]), 2,len(training_sets[0][1]))
+    for x in range(len(training_sets)):
+        for y in range(len(training_sets)):
+            nn.train(training_sets[y][0], training_sets[y][1])
+            nn.calculate_total_error(training_sets)
+    print("Entrenamiento con funcion Simboide")
     cargarTrainingPrueba()
-    print(training_setsprueba)
-    training_inputs_d, training_outputs_d = random.choice(training_setsprueba)
+    #training_inputs_d, training_outputs_d = random.choice(training_setsprueba)
     #nn.feed_forward(training_inputs_d)
     print("capa salida Salida:", nn.output_layer.neurons[0].output)
     print("capa oculta Salida:", nn.hidden_layer.neurons[0].output)
     print("Pesos finales:", nn.output_layer.neurons[0].weights)
     print("======RESULTADOS=======")
-    print(training_outputs_d)
-    load_weights_hidden_layer()
-    nn.test_algorithm(training_inputs_d)
+    print(training_setsprueba[0][1])
+    nn1 = NeuralNetwork(len(training_setsprueba[0][0]),1,1,nn.hidden_layer.neurons[0].weights,nn.output_layer.neurons[0].weights)
+    nn1.test_algorithm(training_setsprueba[0][0])
+    #Entrenamiento sin la funcion simboide
+    nn2 = NeuralNetwork(len(training_sets[0][0]), 2,len(training_sets[0][1]))
+    for x in range(len(training_sets)):
+        for y in range(len(training_sets)):
+            nn.train(training_sets[y][0], training_sets[y][1])
+            nn.calculate_total_error(training_sets)
+    print("Entrenamiento con sin la funcion Simboide")
+    #training_inputs_d, training_outputs_d = random.choice(training_setsprueba)
+    #nn.feed_forward(training_inputs_d)
+    print("capa salida Salida:", nn.output_layer.neurons[0].output)
+    print("capa oculta Salida:", nn.hidden_layer.neurons[0].output)
+    print("Pesos finales:", nn.output_layer.neurons[0].weights)
+    print("======RESULTADOS=======")
+    print("Salida esperada: ",training_setsprueba[0][1])
+    nn3 = NeuralNetwork(len(training_setsprueba[0][0]),1,1,nn.hidden_layer.neurons[0].weights,nn.output_layer.neurons[0].weights)
+    nn3.test_algorithm(training_setsprueba[0][0])
+
+
     
